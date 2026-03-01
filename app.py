@@ -1298,116 +1298,147 @@ def page_analytics_and_promotion():
                 product_data['qty_sold']
             )
             
-            if optimal_discount >= 0:
-                # Calculate predicted outcomes with optimal discount
-                elasticity = calculate_price_elasticity(selected_product)
+            # Handle both discounts (positive) and price increases (negative)
+            elasticity = calculate_price_elasticity(selected_product)
+            
+            if optimal_discount > 0:
+                # DISCOUNT scenario
+                new_price = product_data['price_unit'] * (1 - optimal_discount / 100)
+                quantity_change_pct = elasticity * (-optimal_discount)
+                action_text = f"Apply {optimal_discount}% DISCOUNT"
+            elif optimal_discount < 0:
+                # PRICE INCREASE scenario
+                price_increase = -optimal_discount
+                new_price = product_data['price_unit'] * (1 + price_increase / 100)
+                quantity_change_pct = elasticity * price_increase  # Opposite direction
+                action_text = f"Increase price by {price_increase}%"
+            else:
+                # NO CHANGE needed
+                new_price = product_data['price_unit']
+                quantity_change_pct = 0
+                action_text = "Keep current price"
+            
+            new_qty = product_data['qty_sold'] * (1 + quantity_change_pct / 100)
+            
+            new_revenue = new_price * new_qty
+            new_cost = product_data['cost_unit'] * new_qty
+            new_profit = new_revenue - new_cost
+            profit_change = new_profit - product_data['total_profit']
+            profit_change_pct = (profit_change / product_data['total_profit'] * 100) if product_data['total_profit'] > 0 else 0
+            
+            st.subheader("🤖 AI Recommendation")
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
                 if optimal_discount > 0:
-                    new_price = product_data['price_unit'] * (1 - optimal_discount / 100)
-                    quantity_change_pct = elasticity * (-optimal_discount)
+                    st.metric(
+                        "Recommendation",
+                        f"Discount {optimal_discount}%",
+                        help="AI recommends discount to boost volume and profit"
+                    )
+                elif optimal_discount < 0:
+                    st.metric(
+                        "Recommendation",
+                        f"Raise price {-optimal_discount}%",
+                        help="AI recommends price increase - margin too thin"
+                    )
                 else:
-                    new_price = product_data['price_unit']
-                    quantity_change_pct = 0
-                
-                new_qty = product_data['qty_sold'] * (1 + quantity_change_pct / 100)
-                
-                new_revenue = new_price * new_qty
-                new_cost = product_data['cost_unit'] * new_qty
-                new_profit = new_revenue - new_cost
-                profit_change = new_profit - product_data['total_profit']
-                profit_change_pct = (profit_change / product_data['total_profit'] * 100) if product_data['total_profit'] > 0 else 0
-                
-                st.subheader("🤖 AI Recommendation")
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
                     st.metric(
-                        "Optimal Discount",
-                        f"{optimal_discount}%",
-                        help=f"Recommend {optimal_discount}% discount to maximize profit"
+                        "Recommendation",
+                        "Keep current price",
+                        help="Already optimally priced"
                     )
-                with col2:
-                    st.metric(
-                        "New Price",
-                        f"RM{new_price:.2f}",
-                        delta=f"{-optimal_discount}%",
-                        delta_color="inverse"
-                    )
-                with col3:
-                    st.metric(
-                        "Expected Volume Boost",
-                        f"{quantity_change_pct:+.0f}%",
-                        delta=f"{new_qty - product_data['qty_sold']:+.0f} units"
-                    )
-                
-                st.divider()
-                
-                # Impact metrics
-                st.subheader("💰 Projected Impact with AI Recommendation")
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric(
-                        "New Revenue",
-                        f"RM{new_revenue:,.2f}",
-                        delta=f"{((new_revenue / product_data['total_revenue'] - 1) * 100):+.1f}%"
-                    )
-                with col2:
-                    st.metric(
-                        "New Profit",
-                        f"RM{new_profit:,.2f}",
-                        delta=f"RM{profit_change:+,.2f}",
-                        delta_color="off" if profit_change > 0 else "inverse"
-                    )
-                with col3:
-                    new_margin = ((new_profit / new_revenue * 100) if new_revenue > 0 else 0)
-                    st.metric(
-                        "New Margin %",
-                        f"{new_margin:.1f}%",
-                        delta=f"{new_margin - product_data['profit_margin_%']:+.1f}%",
-                        delta_color="off"
-                    )
-                
-                # Comparison chart
-                comparison = pd.DataFrame({
-                    'Metric': ['Revenue', 'Cost', 'Profit'],
-                    'Current': [product_data['total_revenue'], product_data['total_cost'], product_data['total_profit']],
-                    'With AI Promotion': [new_revenue, new_cost, new_profit]
-                })
-                
-                fig_comparison = px.bar(
-                    comparison,
-                    x='Metric',
-                    y=['Current', 'With AI Promotion'],
-                    barmode='group',
-                    title=f'AI Promotion Impact - {optimal_discount}% Discount',
-                    labels={'value': 'Amount (RM)', 'variable': 'Scenario'},
-                    color_discrete_map={'Current': '#667eea', 'With AI Promotion': '#764ba2'}
+            with col2:
+                st.metric(
+                    "New Price",
+                    f"RM{new_price:.2f}",
+                    delta=f"RM{new_price - product_data['price_unit']:+.2f}",
+                    delta_color="off"
                 )
-                fig_comparison.update_layout(height=400)
-                st.plotly_chart(fig_comparison, use_container_width=True)
-                
-                # Final recommendation
-                st.divider()
-                if optimal_discount > 0 and profit_change > 0:
-                    st.success(
-                        f"✅ **RECOMMENDED**: Apply {optimal_discount}% discount\n\n"
-                        f"Expected profit increase: **RM{profit_change:,.2f}** ({profit_change_pct:+.1f}%)\n\n"
-                        f"This discount will boost customer engagement while maximizing profitability."
-                    )
-                elif optimal_discount > 0:
-                    st.info(
-                        f"⚠️ **LIMITED OPPORTUNITY**: Even with {optimal_discount}% discount, profit increase is marginal.\n\n"
-                        f"Consider:\n"
-                        f"- Focusing on products with higher margins\n"
-                        f"- Bundling this item with higher-profit products\n"
-                        f"- Running time-based promotions to drive volume"
-                    )
-                else:
-                    st.success(
-                        f"✅ **OPTIMAL STRATEGY**: No discount needed\n\n"
-                        f"Your current pricing at **RM{product_data['price_unit']:.2f}** is already optimized.\n\n"
-                        f"With a **{product_data['profit_margin_%']:.1f}% profit margin**, focus on volume growth through other marketing channels."
-                    )
+            with col3:
+                st.metric(
+                    "Expected Volume Change",
+                    f"{quantity_change_pct:+.0f}%",
+                    delta=f"{new_qty - product_data['qty_sold']:+.0f} units"
+                )
+            
+            st.divider()
+            
+            # Impact metrics
+            st.subheader("💰 Projected Impact with AI Recommendation")
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric(
+                    "New Revenue",
+                    f"RM{new_revenue:,.2f}",
+                    delta=f"RM{new_revenue - product_data['total_revenue']:+,.2f}"
+                )
+            with col2:
+                st.metric(
+                    "New Profit",
+                    f"RM{new_profit:,.2f}",
+                    delta=f"RM{profit_change:+,.2f}",
+                    delta_color="off" if profit_change >= 0 else "inverse"
+                )
+            with col3:
+                new_margin = ((new_profit / new_revenue * 100) if new_revenue > 0 else 0)
+                st.metric(
+                    "New Margin %",
+                    f"{new_margin:.1f}%",
+                    delta=f"{new_margin - product_data['profit_margin_%']:+.1f}%",
+                    delta_color="off"
+                )
+            
+            # Comparison chart
+            comparison = pd.DataFrame({
+                'Metric': ['Revenue', 'Cost', 'Profit'],
+                'Current': [product_data['total_revenue'], product_data['total_cost'], product_data['total_profit']],
+                'With AI Adjustment': [new_revenue, new_cost, new_profit]
+            })
+            
+            fig_comparison = px.bar(
+                comparison,
+                x='Metric',
+                y=['Current', 'With AI Adjustment'],
+                barmode='group',
+                title=f'{action_text}',
+                labels={'value': 'Amount (RM)', 'variable': 'Scenario'},
+                color_discrete_map={'Current': '#667eea', 'With AI Adjustment': '#764ba2'}
+            )
+            fig_comparison.update_layout(height=400)
+            st.plotly_chart(fig_comparison, use_container_width=True)
+            
+            # Final recommendation
+            st.divider()
+            if optimal_discount > 0 and profit_change > 0:
+                st.success(
+                    f"✅ **RECOMMENDED**: {action_text}\n\n"
+                    f"Expected profit increase: **RM{profit_change:,.2f}** ({profit_change_pct:+.1f}%)\n\n"
+                    f"This adjustment will optimize engagement while maximizing profitability."
+                )
+            elif optimal_discount > 0:
+                st.info(
+                    f"⚠️ **LIMITED OPPORTUNITY**: Even with {optimal_discount}% discount, profit increase is marginal.\n\n"
+                    f"Consider:\n"
+                    f"- Focusing on products with higher margins\n"
+                    f"- Bundling this item with higher-profit products\n"
+                    f"- Running time-based promotions to drive volume"
+                )
+            elif optimal_discount < 0:
+                st.success(
+                    f"✅ **PRICE INCREASE RECOMMENDED**: {action_text}\n\n"
+                    f"Your current profit margin is too thin. Raising price by {-optimal_discount}% will:\n"
+                    f"- Increase profit: **RM{profit_change:,.2f}** ({profit_change_pct:+.1f}%)\n"
+                    f"- Reduce volume by ~{-quantity_change_pct:.0f}% (still profitable)\n"
+                    f"- Improve overall margin health"
+                )
+            else:
+                st.success(
+                    f"✅ **OPTIMAL STRATEGY**: Keep current price\n\n"
+                    f"Your current pricing at **RM{product_data['price_unit']:.2f}** is already optimized.\n\n"
+                    f"With a **{product_data['profit_margin_%']:.1f}% profit margin**, focus on volume growth through other marketing channels."
+                )
     
     st.divider()
     
@@ -1942,119 +1973,115 @@ def page_loan_center():
     
     st.divider()
     
-    # Loan Application Form
-    st.subheader("📝 Loan Application Form")
-    
-    with st.form("loan_form"):
-        col1, col2 = st.columns(2)
+    # ========== LOAN APPLICATION FORM (Only show when program selected) ==========
+    if st.session_state.get('selected_program'):
+        selected_prog = st.session_state['selected_program']
         
-        with col1:
-            st.text_input(
-                "Business Name",
-                value=profile['business_name'],
-                disabled=True
-            )
-            st.number_input(
-                "Annual Revenue",
-                value=int(total_revenue),
-                disabled=True
-            )
+        st.subheader(f"📝 Loan Application Form - {selected_prog['provider']}")
+        st.write(f"**Program:** {selected_prog['program']}")
+        st.write(f"**Description:** {selected_prog['description']}")
         
-        with col2:
-            st.text_input(
-                "Business Type",
-                value=profile['business_type'],
-                disabled=True
+        with st.form("loan_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.text_input(
+                    "Business Name",
+                    value=profile['business_name'],
+                    disabled=True
+                )
+                st.number_input(
+                    "Annual Revenue",
+                    value=int(total_revenue),
+                    disabled=True
+                )
+            
+            with col2:
+                st.text_input(
+                    "Business Type",
+                    value=profile['business_type'],
+                    disabled=True
+                )
+                st.number_input(
+                    "Years Operating",
+                    value=profile['years_operating'],
+                    disabled=True
+                )
+            
+            st.divider()
+            
+            requested_amount = st.number_input(
+                "Requested Loan Amount (RM)",
+                min_value=0,
+                max_value=int(selected_prog['max_loan']),
+                step=10000,
+                value=min(int(max_loan * 0.5), int(selected_prog['max_loan']))
             )
-            st.number_input(
-                "Years Operating",
-                value=profile['years_operating'],
-                disabled=True
+            
+            purpose = st.selectbox(
+                "Loan Purpose",
+                ["Expansion", "Equipment", "Working Capital", "Debt Consolidation", "Other"]
             )
+            
+            # Contact information
+            col1, col2 = st.columns(2)
+            with col1:
+                email = st.text_input("Email Address", placeholder="your.email@example.com")
+            with col2:
+                phone = st.text_input("Phone Number", placeholder="+60...")
+            
+            additional_notes = st.text_area(
+                "Additional Notes (Optional)",
+                placeholder="Tell the lender about your business and why you need this loan..."
+            )
+            
+            submitted = st.form_submit_button(
+                f"📤 Submit Application to {selected_prog['provider']}",
+                use_container_width=True
+            )
+            
+            if submitted:
+                if not email or not phone:
+                    st.error("❌ Please fill in email and phone number")
+                else:
+                    # Save application
+                    st.session_state.loan_status['status'] = 'Submitted'
+                    st.session_state.loan_status['requested_amount'] = requested_amount
+                    st.session_state.loan_status['provider'] = selected_prog['provider']
+                    st.session_state.loan_status['program'] = selected_prog['program']
+                    st.session_state.loan_status['email'] = email
+                    st.session_state.loan_status['phone'] = phone
+                    
+                    st.success("✅ Application submitted successfully!")
+                    st.rerun()
         
         st.divider()
         
-        requested_amount = st.number_input(
-            "Requested Loan Amount (₹)",
-            min_value=0,
-            max_value=int(max_loan),
-            step=10000,
-            value=min(int(max_loan * 0.5), int(max_loan))
-        )
-        
-        purpose = st.selectbox(
-            "Loan Purpose",
-            ["Expansion", "Equipment", "Working Capital", "Debt Consolidation", "Other"]
-        )
-        
-        submitted = st.form_submit_button("📤 Submit Application", use_container_width=True)
-        
-        if submitted:
-            # Simulate approval status
-            if loan_score >= 0.75:
-                status = "Approved"
-                status_emoji = "✅"
-                color_style = "success-status"
-            elif loan_score >= 0.5:
-                status = "Processing"
-                status_emoji = "⏳"
-                color_style = "warning-status"
-            else:
-                status = "Rejected"
-                status_emoji = "❌"
-                color_style = "danger-status"
+        # ========== APPLICATION STATUS ==========
+        if st.session_state.loan_status['status'] == 'Submitted':
+            st.subheader("📌 Application Status")
             
-            st.session_state.loan_status['status'] = status
-            st.session_state.loan_status['requested_amount'] = requested_amount
+            status_data = st.session_state.loan_status
             
-            st.rerun()
-    
-    # Loan Status Display
-    if st.session_state.loan_status['status'] != 'Not Applied':
-        st.divider()
-        st.subheader("📌 Application Status")
-        
-        status = st.session_state.loan_status['status']
-        requested = st.session_state.loan_status['requested_amount']
-        
-        if status == "Approved":
             st.markdown(f"""
             <div class="success-status">
-            <h4>✅ APPROVED</h4>
-            <p><strong>Application Status:</strong> Your loan application has been <b>APPROVED</b></p>
-            <p><strong>Requested Amount:</strong> ₹{requested:,.0f}</p>
-            <p><strong>Approval Limit:</strong> ₹{max_loan:,.0f}</p>
-            <p><strong>Next Steps:</strong> Our loan officer will contact you within 24 hours.</p>
+            <h4>✅ APPLICATION SUBMITTED</h4>
+            <p><strong>Provider:</strong> {status_data.get('provider', 'N/A')}</p>
+            <p><strong>Program:</strong> {status_data.get('program', 'N/A')}</p>
+            <p><strong>Requested Amount:</strong> RM{status_data.get('requested_amount', 0):,.0f}</p>
+            <p><strong>Your Loan Score:</strong> {loan_score:.2f}/1.0</p>
+            <p><strong>Email:</strong> {status_data.get('email', 'N/A')}</p>
+            <p><strong>Status:</strong> Your application has been submitted. The lender will review and contact you within 2-5 business days.</p>
             </div>
             """, unsafe_allow_html=True)
-        
-        elif status == "Processing":
-            st.markdown(f"""
-            <div class="warning-status">
-            <h4>⏳ UNDER REVIEW</h4>
-            <p><strong>Application Status:</strong> Your application is <b>UNDER REVIEW</b></p>
-            <p><strong>Requested Amount:</strong> ₹{requested:,.0f}</p>
-            <p><strong>Estimated Time:</strong> 5-7 business days</p>
-            <p><strong>What happens next:</strong> We'll verify your documents and conduct a business assessment.</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        else:
-            st.markdown(f"""
-            <div class="danger-status">
-            <h4>❌ NOT ELIGIBLE</h4>
-            <p><strong>Application Status:</strong> Unfortunately, you are currently <b>NOT ELIGIBLE</b></p>
-            <p><strong>Loan Score:</strong> {loan_score:.2f}/1.0 (Minimum required: 0.50)</p>
-            <p><strong>Recommendations:</strong></p>
-            <ul>
-            <li>Increase monthly revenue through sales growth</li>
-            <li>Improve profit margins</li>
-            <li>Reduce existing debt commitments</li>
-            <li>Build more consistent sales records</li>
-            </ul>
-            <p><strong>Re-apply after:</strong> 3 months</p>
-            </div>
-            """, unsafe_allow_html=True)
+            
+            if st.button("Clear Application & Start Over"):
+                st.session_state.loan_status = {'status': 'Not Applied', 'requested_amount': 0}
+                if 'selected_program' in st.session_state:
+                    del st.session_state['selected_program']
+                st.rerun()
+    else:
+        st.info("💡 **No loan program selected yet.** Click the 'Apply for [Program]' button above to view and fill the application form.")
 
 # ============================================================================
 # MAIN APP NAVIGATION
