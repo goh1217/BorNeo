@@ -29,6 +29,146 @@ st.set_page_config(
 
 st.markdown("""
     <style>
+    /* ── Hide default Streamlit sidebar decoration ── */
+    [data-testid="stSidebarHeader"] { display: none !important; }
+    [data-testid="stSidebarNav"]    { display: none !important; }
+    section[data-testid="stSidebar"] > div:first-child {
+        padding-top: 0 !important;
+    }
+
+    /* ── Sidebar shell ── */
+    section[data-testid="stSidebar"] {
+        background: #ffffff !important;
+        border-right: 1px solid #e2e8f0;
+    }
+
+    /* ── Nav link base ── */
+    .nav-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 10px;
+        border-radius: 10px;
+        text-decoration: none;
+        color: #64748b;
+        font-size: 14px;
+        font-weight: 500;
+        transition: background 0.15s, color 0.15s;
+        margin-bottom: 2px;
+        cursor: pointer;
+        font-family: 'Inter', sans-serif;
+    }
+    .nav-link:hover {
+        background: #f8fafc;
+        color: #1e293b;
+    }
+    .nav-link.active {
+        background: #eef2ff;
+        color: #3730a3;
+        font-weight: 600;
+    }
+    .nav-link .nav-icon {
+        font-size: 20px;
+        flex-shrink: 0;
+    }
+
+    /* ── Logo block ── */
+    .sidebar-logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 22px 20px 18px;
+    }
+    .logo-tile {
+        width: 44px;
+        height: 44px;
+        background: #3730a3;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 8px rgba(55,48,163,.30);
+        flex-shrink: 0;
+    }
+    .logo-tile span {
+        color: #fff;
+        font-size: 22px;
+    }
+    .logo-text h1 {
+        font-size: 14px;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+        letter-spacing: -0.3px;
+        font-family: 'Inter', sans-serif;
+    }
+    .logo-text p {
+        font-size: 9.5px;
+        font-weight: 700;
+        color: #94a3b8;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin: 0;
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* ── Business info card at bottom ── */
+    .biz-card {
+        margin: 0 12px 16px;
+        padding: 12px 14px;
+        background: #f8fafc;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        font-family: 'Inter', sans-serif;
+    }
+    .biz-card .biz-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        margin-bottom: 6px;
+    }
+    .biz-card .biz-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1e293b;
+    }
+    .biz-card .biz-detail {
+        font-size: 11.5px;
+        color: #64748b;
+        margin-top: 2px;
+    }
+
+    /* ── Collapse invisible nav buttons — kill ALL wrapper spacing ── */
+
+    /* Zero out the element wrapper that Streamlit adds around each button */
+    section[data-testid="stSidebar"] div[data-testid="stElementContainer"]:has(button[kind="secondary"]),
+    section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:has(button[kind="secondary"]),
+    section[data-testid="stSidebar"] div.stButton:has(button[kind="secondary"]) {
+        padding: 0 !important;
+        margin: 0 !important;
+        line-height: 0 !important;
+    }
+
+    /* Shrink the button itself to a razor-thin click target */
+    section[data-testid="stSidebar"] button[kind="secondary"] {
+        position: relative;
+        top: -44px;
+        height: 44px;
+        min-height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        margin-bottom: -44px !important;
+        opacity: 0;
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        cursor: pointer;
+        display: block;
+    }
+
+    /* ── Metric card ── */
     .metric-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 20px;
@@ -58,7 +198,11 @@ st.markdown("""
         color: #721c24;
     }
     </style>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 """, unsafe_allow_html=True)
+
 
 # ============================================================================
 # SESSION STATE INITIALIZATION
@@ -854,9 +998,19 @@ def page_pos_system():
     col1, col2 = st.columns(2)
     
     # Add Product Section
+    if st.session_state.get('product_added_success'):
+        added_name = st.session_state.get('product_added_name', '')
+        added_profit = st.session_state.get('product_added_profit', 0)
+        st.success(f"**Product '{added_name}' added successfully!** Profit per unit: RM{added_profit:.2f}")
+        # Clear the flag after showing once
+        st.session_state.product_added_success = False
+
     with col1:
         st.subheader("➕ Add Product")
-        with st.form("add_product_form"):
+
+        # Form key changes after add to effectively reset the form
+        form_key = f"add_product_form_{st.session_state.get('product_form_version', 0)}"
+        with st.form(form_key):
             product_name = st.text_input("Product Name", placeholder="e.g., Biryani")
             product_category = st.selectbox(
                 "Category",
@@ -868,29 +1022,43 @@ def page_pos_system():
             
             submitted = st.form_submit_button("Add Product", use_container_width=True)
             
-            if submitted and product_name:
-                # Validate profit
-                profit_per_unit = product_price - product_cost
-                if profit_per_unit <= 0:
-                    st.error("❌ Selling price must be higher than cost!")
+            if submitted:
+                if not product_name.strip():
+                    st.error("❌ Please enter a product name!")
                 else:
-                    new_product = pd.DataFrame({
-                        'name': [product_name],
-                        'category': [product_category],
-                        'price': [product_price],
-                        'cost': [product_cost],
-                        'stock': [product_stock]
-                    })
-                    st.session_state.products = pd.concat(
-                        [st.session_state.products, new_product],
-                        ignore_index=True
-                    )
-                    st.success(f"✅ Added! Profit per unit: RM{profit_per_unit:.0f}")
-                    st.rerun()
+                    # Check for duplicate product name (case-insensitive)
+                    existing_names = st.session_state.products['name'].str.lower().tolist() if not st.session_state.products.empty else []
+                    if product_name.strip().lower() in existing_names:
+                        st.error(f"❌ Product **'{product_name}'** already exists! Please use a different name.")
+                    else:
+                        # Validate profit
+                        profit_per_unit = product_price - product_cost
+                        if profit_per_unit <= 0:
+                            st.error("❌ Selling price must be higher than cost!")
+                        else:
+                            new_product = pd.DataFrame({
+                                'name': [product_name.strip()],
+                                'category': [product_category],
+                                'price': [product_price],
+                                'cost': [product_cost],
+                                'stock': [product_stock]
+                            })
+                            st.session_state.products = pd.concat(
+                                [st.session_state.products, new_product],
+                                ignore_index=True
+                            )
+                            # Set success flags for display above the form
+                            st.session_state.product_added_success = True
+                            st.session_state.product_added_name = product_name.strip()
+                            st.session_state.product_added_profit = profit_per_unit
+                            # Bump form version to reset fields
+                            st.session_state.product_form_version = st.session_state.get('product_form_version', 0) + 1
+                            st.rerun()
     
     # Record Sale Section
     with col2:
         st.subheader("💳 Record Sale")
+
         
         if st.session_state.products.empty:
             st.warning("Please add products first.")
@@ -968,41 +1136,58 @@ def page_pos_system():
                             [st.session_state.sales, new_sale],
                             ignore_index=True
                         )
-                        
-                        st.success(f"✅ Sale recorded! Revenue: RM{revenue:,.0f}")
+
+                        # Set success flags for display below Record Sale button
+                        st.session_state.sale_recorded_success = True
+                        st.session_state.sale_recorded_product = selected_product
+                        st.session_state.sale_recorded_qty = quantity
+                        st.session_state.sale_recorded_revenue = revenue
                         st.rerun()
+
+                # Show success banner below the Record Sale button
+                if st.session_state.get('sale_recorded_success'):
+                    sale_product = st.session_state.get('sale_recorded_product', '')
+                    sale_qty = st.session_state.get('sale_recorded_qty', 0)
+                    sale_revenue = st.session_state.get('sale_recorded_revenue', 0.0)
+                    st.success(f"✅ **Sale recorded!** {sale_qty} × {sale_product} — Revenue: RM{sale_revenue:,.2f}")
+                    st.session_state.sale_recorded_success = False
     
     st.divider()
     
-    # Products Inventory - EDITABLE
-    st.subheader("📦 Inventory & Profitability - (Edit inline)")
+    # Products Inventory
+    st.subheader("📦 Inventory & Profitability")
     if not st.session_state.products.empty:
-        display_products = st.session_state.products.copy()
-        display_products['profit_per_unit'] = display_products['price'] - display_products['cost']
-        display_products['profit_margin_%'] = ((display_products['price'] - display_products['cost']) / display_products['price'] * 100).round(1)
-        
-        # Make it editable
+        # Make it editable with row deletion enabled
         edited_df = st.data_editor(
-            display_products[['name', 'category', 'price', 'cost', 'stock']],
+            st.session_state.products[['name', 'category', 'price', 'cost', 'stock']].copy(),
             use_container_width=True,
             hide_index=True,
+            num_rows="dynamic",  # Allows row deletion via the trash icon
             column_config={
-                'name': st.column_config.TextColumn('Product', disabled=True),
+                'name': st.column_config.TextColumn('Product'),
                 'category': st.column_config.TextColumn('Category'),
                 'price': st.column_config.NumberColumn('Price (RM)', format='RM %.2f'),
                 'cost': st.column_config.NumberColumn('Cost (RM)', format='RM %.2f'),
                 'stock': st.column_config.NumberColumn('Stock (units)', format='%d')
             }
         )
-        
-        # Update session state with edited values
-        st.session_state.products = edited_df.copy()
-        
-        # Show summary with profit margins
+
+        # Detect if rows were deleted and notify the user
+        if len(edited_df) < len(st.session_state.products):
+            removed = len(st.session_state.products) - len(edited_df)
+            st.session_state.products = edited_df.reset_index(drop=True).copy()
+            st.success(f"🗑️ {removed} product(s) removed from inventory.")
+            st.rerun()
+        else:
+            # Update session state with edited values (no deletion)
+            st.session_state.products = edited_df.reset_index(drop=True).copy()
+
+        # Show summary with profit margins (read-only)
+        st.caption("📊 Profitability Summary")
         display_products = st.session_state.products.copy()
         display_products['profit_per_unit'] = display_products['price'] - display_products['cost']
         display_products['profit_margin_%'] = ((display_products['price'] - display_products['cost']) / display_products['price'] * 100).round(1)
-        
+
         st.dataframe(
             display_products[['name', 'price', 'cost', 'profit_per_unit', 'profit_margin_%', 'stock']],
             use_container_width=True,
@@ -1017,7 +1202,7 @@ def page_pos_system():
             }
         )
     else:
-        st.info("No products yet.")
+        st.info("No products yet. Add your first product using the form above.")
     
     # Sales History
     st.subheader("📜 Recent Sales")
@@ -2087,34 +2272,69 @@ def page_loan_center():
 # MAIN APP NAVIGATION
 # ============================================================================
 def main():
-    # Sidebar navigation
-    st.sidebar.title("💼 MSME BI System")
-    st.sidebar.divider()
-    
-    page = st.sidebar.radio(
-        "Navigation",
-        [
-            "Dashboard",
-            "Business Registration",
-            "POS System",
-            "Upload CSV",
-            "Analytics & Promotion",
-            "Simulation",
-            "Loan Center"
-        ],
-        label_visibility="collapsed"
-    )
-    
-    st.sidebar.divider()
-    
-    # Display business info in sidebar
-    if st.session_state.user_profile['business_name']:
-        st.sidebar.markdown("### Business Info")
-        st.sidebar.write(f"**{st.session_state.user_profile['business_name']}**")
-        st.sidebar.write(f"Type: {st.session_state.user_profile['business_type']}")
-        st.sidebar.write(f"Revenue: ₹{st.session_state.user_profile['monthly_revenue']:,.0f}/mo")
-    
-    # Route to pages
+    initialize_session_state()
+
+    # ── Page list and icon mapping ──
+    pages = [
+        ("Dashboard",             "dashboard"),
+        ("Business Registration", "app_registration"),
+        ("POS System",            "point_of_sale"),
+        ("Upload CSV",            "upload_file"),
+        ("Analytics & Promotion", "campaign"),
+        ("Simulation",            "model_training"),
+        ("Loan Center",           "account_balance"),
+    ]
+
+    # Track current page in session state
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = "Dashboard"
+
+    # ── Custom sidebar ──
+    with st.sidebar:
+        # Logo
+        st.markdown("""
+        <div class="sidebar-logo">
+            <div class="logo-tile">
+                <span class="material-symbols-outlined">insights</span>
+            </div>
+            <div class="logo-text">
+                <h1>MSME BI</h1>
+                <p>Executive View</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Nav items — one button per page
+        for label, icon in pages:
+            is_active = (st.session_state.current_page == label)
+            active_cls = "active" if is_active else ""
+            # Render as styled HTML but back by a real Streamlit button (zero-height)
+            st.markdown(f"""
+            <div class="nav-link {active_cls}">
+                <span class="material-symbols-outlined nav-icon">{icon}</span>
+                <span>{label}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            # Invisible real button for click handling
+            if st.button(label, key=f"nav_{label}", use_container_width=True,
+                         type="secondary"):
+                st.session_state.current_page = label
+                st.rerun()
+
+        # Business info card at the bottom
+        profile = st.session_state.user_profile
+        if profile.get('business_name'):
+            st.markdown(f"""
+            <div class="biz-card">
+                <div class="biz-label">Active Business</div>
+                <div class="biz-name">{profile['business_name']}</div>
+                <div class="biz-detail">{profile['business_type']}</div>
+                <div class="biz-detail">RM{profile['monthly_revenue']:,.0f} / mo</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # ── Route to page ──
+    page = st.session_state.current_page
     if page == "Dashboard":
         page_dashboard()
     elif page == "Business Registration":
@@ -2129,6 +2349,7 @@ def main():
         page_simulation()
     elif page == "Loan Center":
         page_loan_center()
+
 
 if __name__ == "__main__":
     main()
